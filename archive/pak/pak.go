@@ -102,7 +102,7 @@ func (rc *Reader) init(r io.ReaderAt, size int64) error {
 		return err
 	}
 
-	if header.Id != [4]byte{'P','A','C','K'} {
+	if header.Id != [4]byte{'P', 'A', 'C', 'K'} {
 		return ErrFormat
 	}
 

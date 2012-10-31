@@ -109,9 +109,9 @@ func (rc *Reader) init(r io.ReaderAt, size int64) error {
 		return err
 	}
 
-	if header.Id == [4]byte{'W','A','D','2'} {
+	if header.Id == [4]byte{'W', 'A', 'D', '2'} {
 		rc.Type = QuakeWad
-	} else if header.Id == [4]byte{'W','A','D','3'} {
+	} else if header.Id == [4]byte{'W', 'A', 'D', '3'} {
 		rc.Type = HalfLifeWad
 	} else {
 		return ErrFormat
@@ -135,7 +135,7 @@ func (rc *Reader) init(r io.ReaderAt, size int64) error {
 			nameLen = 16
 		}
 
-		name := string(bytes.ToLower(wadEntry[16:16+nameLen]))
+		name := string(bytes.ToLower(wadEntry[16 : 16+nameLen]))
 
 		f := &File{
 			Name:   name,
