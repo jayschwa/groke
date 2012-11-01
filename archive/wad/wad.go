@@ -139,7 +139,7 @@ func (rc *Reader) init(r io.ReaderAt, size int64) error {
 
 		f := &File{
 			Name:   name,
-			Size:   binary.LittleEndian.Uint32(wadEntry[8:]),
+			Size:   binary.LittleEndian.Uint32(wadEntry[4:]),
 			Type:   wadEntry[12],
 			offset: binary.LittleEndian.Uint32(wadEntry[:]),
 			r:      r,
