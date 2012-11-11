@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
-	"log"
 )
 
 type Vector3 [3]float64
@@ -60,8 +59,8 @@ type Model struct {
 	Entities     []Entity
 	Faces        []Face
 	planes       []Plane
-	Textures     []Texture
 	TexInfos     []TexInfo
+	Textures     []Texture
 	verts        []Vector3
 }
 
@@ -163,8 +162,6 @@ func (h *bspHeader) Read(r io.ReaderAt, flags int) error {
 			}
 		}
 	}
-
-	log.Printf("%#v", m.Textures)
 
 	return nil
 }
