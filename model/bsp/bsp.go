@@ -55,14 +55,14 @@ type Face struct {
 }
 
 type Model struct {
-	Edges        []Edge
-	EdgeVIndices []EdgeVIndex
+	edges        []Edge
+	edgeVIndices []EdgeVIndex
 	Entities     []Entity
 	Faces        []Face
-	Planes       []Plane
+	planes       []Plane
 	Textures     []Texture
 	TexInfos     []TexInfo
-	Verts        []Vector3
+	verts        []Vector3
 }
 
 type lumpReader func(*io.SectionReader, *Model) error
@@ -110,24 +110,24 @@ const (
 )
 
 var bspHeaders = []*bspHeader{
-	&bspHeader{
+	{
 		[]byte{29, 0, 0, 0},
 		[]lump{
-			lump{0, "entities", q1BSPReadEntities, NoEntities},
-			lump{1, "planes", q1BSPReadPlanes, 0},
-			lump{2, "textures", q1BSPReadTextures, NoTextures},
-			lump{3, "vertices", q1BSPReadVertices, 0},
-			lump{4, "visibility", q1BSPReadVisibility, 0},
-			lump{5, "nodes", q1BSPReadNodes, 0},
-			lump{6, "texture info", q1BSPReadTextureInformation, NoTextures},
-			lump{8, "lightmaps", q1BSPReadLightmaps, NoLightmaps},
-			lump{9, "clipnodes", q1BSPReadClipNodes, 0},
-			lump{10, "leaves", q1BSPReadLeaves, 0},
-			lump{11, "mark surfaces", q1BSPReadMarkSurfaces, 0},
-			lump{12, "edges", q1BSPReadEdges, 0},
-			lump{13, "face edge tables", q1BSPReadFaceEdgeTables, 0},
-			lump{14, "models", q1BSPReadModels, 0},
-			lump{7, "faces", q1BSPReadFaces, 0},
+			{0, "entities", q1BSPReadEntities, NoEntities},
+			{1, "planes", q1BSPReadPlanes, 0},
+			{2, "textures", q1BSPReadTextures, NoTextures},
+			{3, "vertices", q1BSPReadVertices, 0},
+			{4, "visibility", q1BSPReadVisibility, 0},
+			{5, "nodes", q1BSPReadNodes, 0},
+			{6, "texture info", q1BSPReadTextureInformation, NoTextures},
+			{8, "lightmaps", q1BSPReadLightmaps, NoLightmaps},
+			{9, "clipnodes", q1BSPReadClipNodes, 0},
+			{10, "leaves", q1BSPReadLeaves, 0},
+			{11, "mark surfaces", q1BSPReadMarkSurfaces, 0},
+			{12, "edges", q1BSPReadEdges, 0},
+			{13, "face edge tables", q1BSPReadFaceEdgeTables, 0},
+			{14, "models", q1BSPReadModels, 0},
+			{7, "faces", q1BSPReadFaces, 0},
 		},
 	},
 }
