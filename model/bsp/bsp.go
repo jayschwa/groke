@@ -10,11 +10,22 @@ import (
 
 type Vector3 [3]float64
 type PlaneType uint8
+type TexFlags int
 
 type Plane struct {
 	N Vector3
 	D float64
 	T PlaneType
+}
+
+type EdgeVIndex struct {
+	Ai int
+	Bi int
+}
+
+type Edge struct {
+	A Vector3
+	B Vector3
 }
 
 type Texture struct {
@@ -25,12 +36,25 @@ type Texture struct {
 	r          *io.SectionReader
 }
 
+type TexInfo struct {
+	S       Vector3
+	T       Vector3
+	Ds      float64
+	Dt      float64
+	Texture *Texture
+	Flags   TexFlags
+}
+
 type Entity map[string]string
 
 type Model struct {
-	Entities []Entity
-	Planes   []Plane
-	Textures []Texture
+	Edges        []Edge
+	EdgeVIndices []EdgeVIndex
+	Entities     []Entity
+	Planes       []Plane
+	Textures     []Texture
+	TexInfos     []TexInfo
+	Verts        []Vector3
 }
 
 type lumpReader func(*io.SectionReader, *Model) error
@@ -61,6 +85,10 @@ const (
 	PlaneNonAxialX
 	PlaneNonAxialY
 	PlaneNonAxialZ
+)
+
+const (
+	TexAnimated = TexFlags(1 << iota)
 )
 
 const (
