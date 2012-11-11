@@ -140,13 +140,14 @@ func q1BSPReadTextures(r *io.SectionReader, m *Model) error {
 func q1BSPReadVertices(r *io.SectionReader, m *Model) error {
 	numVerts := int(r.Size() / 12)
 	m.Verts = make([]Vector3, numVerts)
+	verts := make([][3]float32, numVerts)
+
+	if err := binary.Read(r, binary.LittleEndian, &verts); err != nil {
+		return err
+	}
 
 	for i := 0; i < numVerts; i++ {
-		var v [3]float32
-		if err := binary.Read(r, binary.LittleEndian, &v); err != nil {
-			return err
-		}
-
+		v := verts[i]
 		m.Verts[i] = Vector3{float64(v[0]), float64(v[1]), float64(v[2])}
 	}
 
@@ -164,20 +165,22 @@ func q1BSPReadNodes(r *io.SectionReader, m *Model) error {
 func q1BSPReadTextureInformation(r *io.SectionReader, m *Model) error {
 	numInfo := int(r.Size() / 40)
 	m.TexInfos = make([]TexInfo, 0, numInfo)
-	var info struct {
+	infos := make([]struct {
 		S     [3]float32
 		Ds    float32
 		T     [3]float32
 		Dt    float32
 		TexID uint32
 		Anim  uint32
+	}, numInfo)
+
+	if err := binary.Read(r, binary.LittleEndian, &infos); err != nil {
+		return err
 	}
 
 	for i := 0; i < numInfo; i++ {
-		if err := binary.Read(r, binary.LittleEndian, &info); err != nil {
-			return err
-		}
 		var flags TexFlags
+		info := infos[i]
 
 		if info.Anim != 0 {
 			flags |= TexAnimated
@@ -197,6 +200,38 @@ func q1BSPReadTextureInformation(r *io.SectionReader, m *Model) error {
 }
 
 func q1BSPReadFaces(r *io.SectionReader, m *Model) error {
+	numFaces := int(r.Size() / 20)
+	m.Faces = make([]Face, 0, numFaces)
+	fs := make([]struct {
+		Plane     uint16
+		Side      uint16
+		Edge      uint32
+		NumEdges  uint16
+		TexInfoID uint16
+		LightType uint8
+		LightBase uint8
+		Light     [2]uint8
+		LightMap  uint32
+	}, numFaces)
+
+	if err := binary.Read(r, binary.LittleEndian, &fs); err != nil {
+		return err
+	}
+
+	for i := 0; i < numFaces; i++ {
+		f := fs[i]
+		if int(f.Edge)+int(f.NumEdges) >= len(m.Edges) {
+			return fmt.Errorf("face's edges out of range (%d:%d)", f.Edge, f.Edge+uint32(f.NumEdges))
+		}
+
+		m.Faces = append(m.Faces, Face{
+			Edges:   m.Edges[int(f.Edge) : int(f.Edge)+int(f.NumEdges)],
+			Front:   f.Side == 0,
+			Plane:   &m.Planes[int(f.Plane)],
+			TexInfo: &m.TexInfos[int(f.TexInfoID)],
+		})
+	}
+
 	return nil
 }
 
@@ -243,13 +278,14 @@ func q1BSPReadEdges(r *io.SectionReader, m *Model) error {
 func q1BSPReadFaceEdgeTables(r *io.SectionReader, m *Model) error {
 	numEdges := int(r.Size() / 2)
 	m.Edges = make([]Edge, numEdges)
+	edges := make([]int16, numEdges)
+
+	if err := binary.Read(r, binary.LittleEndian, &edges); err != nil {
+		return err
+	}
 
 	for i := 0; i < numEdges; i++ {
-		var v int16
-		if err := binary.Read(r, binary.LittleEndian, &v); err != nil {
-			return err
-		}
-		ei := int(v)
+		ei := int(edges[i])
 
 		if ei >= len(m.EdgeVIndices) || -ei >= len(m.EdgeVIndices) {
 			return fmt.Errorf("edge index out of range (%d)", ei)
