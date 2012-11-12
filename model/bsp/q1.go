@@ -77,13 +77,10 @@ func q1BSPRead(r io.Reader, flags int, m *Model) (err error) {
 		return
 	}
 
-	var lumps []q1Lump
-	{
-		h := sliceHeader(&b)
-		h.Len = 15
-		h.Cap = 15
-		lumps = *(*[]q1Lump)(unsafe.Pointer(&h))
-	}
+	h := sliceHeader(&b)
+	h.Len = 15
+	h.Cap = 15
+	lumps := *(*[]q1Lump)(unsafe.Pointer(&h))
 
 	// entities
 	m.Entities, err = q1ReadEntities(lumps[q1LumpEntities].Data(b))
