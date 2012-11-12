@@ -11,10 +11,14 @@ func TestRead(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = Read(f, 0)
+	var m *Model
+	m, err = Read(f, 0)
 	if err != nil {
 		f.Close()
 		t.Fatal(err)
+	} else if m == nil {
+		f.Close()
+		t.Fatal(m)
 	}
 
 	f.Close()
