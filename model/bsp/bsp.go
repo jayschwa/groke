@@ -22,7 +22,7 @@ type Texture struct {
 	Name   string
 	Width  int
 	Height int
-	data   []byte
+	Data   []byte
 }
 
 type TexInfo struct {

@@ -6,14 +6,45 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"reflect"
 	"unsafe"
 )
 
+type q1EdgeIndex struct {
+	A uint16
+	B uint16
+}
+
+type q1Face struct {
+	Plane     uint16
+	Side      uint16
+	Edge      uint32
+	NumEdges  uint16
+	TexInfoID uint16
+	LightType uint8
+	LightBase uint8
+	Light     [2]uint8
+	LightMap  uint32
+}
+
 type q1Lump struct {
 	Offset uint32
 	Size   uint32
+}
+
+type q1Plane struct {
+	N [3]float32
+	D float32
+	T uint32
+}
+
+type q1TexInfo struct {
+	S     [3]float32
+	Ds    float32
+	T     [3]float32
+	Dt    float32
+	TexID uint32
+	Anim  uint32
 }
 
 const (
@@ -33,69 +64,6 @@ const (
 	q1LumpFaceEdgeTables
 	q1LumpModels
 )
-
-func Uint32(b []byte) int {
-	return int(binary.LittleEndian.Uint32(b))
-}
-
-func (lump q1Lump) String() string {
-	return fmt.Sprintf("{0x%x, 0x%x}", lump.Offset, lump.Size)
-}
-
-func (lump q1Lump) Data(b []byte) []byte {
-	offset := int(lump.Offset - 4)
-	log.Printf("lump [%d:%d]", offset, offset+int(lump.Size))
-	return b[offset : offset+int(lump.Size)]
-}
-
-func sliceHeader(raw *[]byte) reflect.SliceHeader {
-	return *(*reflect.SliceHeader)(unsafe.Pointer(raw))
-}
-
-func stringHeader(raw *[]byte) reflect.StringHeader {
-	return *(*reflect.StringHeader)(unsafe.Pointer(raw))
-}
-
-func stringFrom(b []byte) string {
-	h := reflect.StringHeader{
-		Data: uintptr(unsafe.Pointer(&b[0])),
-		Len:  len(b),
-	}
-
-	return *(*string)(unsafe.Pointer(&h))
-}
-
-type q1EdgeIndex struct {
-	A uint16
-	B uint16
-}
-
-type q1Face struct {
-	Plane     uint16
-	Side      uint16
-	Edge      uint32
-	NumEdges  uint16
-	TexInfoID uint16
-	LightType uint8
-	LightBase uint8
-	Light     [2]uint8
-	LightMap  uint32
-}
-
-type q1Plane struct {
-	N [3]float32
-	D float32
-	T uint32
-}
-
-type q1TexInfo struct {
-	S     [3]float32
-	Ds    float32
-	T     [3]float32
-	Dt    float32
-	TexID uint32
-	Anim  uint32
-}
 
 func q1BSPRead(r io.Reader, flags int, m *Model) (err error) {
 	var b []byte
@@ -130,134 +98,155 @@ func q1BSPRead(r io.Reader, flags int, m *Model) (err error) {
 	}
 
 	// faces
-	{
-		// edge indices
-		var edgeIndices []q1EdgeIndex
-		eb := lumps[q1LumpEdges].Data(b)
-		h := sliceHeader(&eb)
-		h.Len = int(lumps[q1LumpEdges].Size / 4)
-		h.Cap = h.Len
-		edgeIndices = *(*[]q1EdgeIndex)(unsafe.Pointer(&h))
+	m.Faces, err = q1ReadFaces(b, lumps, m)
+	if err != nil {
+		return
+	}
 
-		// vertices
-		var verts []Vector3
-		{
-			vb := lumps[q1LumpVertices].Data(b)
-			h := sliceHeader(&vb)
-			h.Len = int(lumps[q1LumpVertices].Size / 12)
-			h.Cap = h.Len
-			verts32 := *(*[][3]float32)(unsafe.Pointer(&h))
-			verts = make([]Vector3, len(verts32))
-			for i := 0; i < len(verts); i++ {
-				verts[i][0] = float64(verts32[i][0])
-				verts[i][1] = float64(verts32[i][1])
-				verts[i][2] = float64(verts32[i][2])
-			}
-		}
+	return
+}
 
-		// face edge tables
-		var faceEdges []int16
-		{
-			fb := lumps[q1LumpFaceEdgeTables].Data(b)
-			h := sliceHeader(&fb)
-			h.Len = int(lumps[q1LumpFaceEdgeTables].Size / 2)
-			h.Cap = h.Len
-			faceEdges = *(*[]int16)(unsafe.Pointer(&h))
-		}
+func q1ReadPlanes(b []byte) (planes []Plane, err error) {
+	h := sliceHeader(&b)
+	h.Len = len(b) / 2
+	h.Cap = h.Len
+	planes32 := *(*[]q1Plane)(unsafe.Pointer(&h))
+	planes = make([]Plane, 0, len(planes32))
 
-		// planes
-		var planes []Plane
-		{
-			pb := lumps[q1LumpPlanes].Data(b)
-			h := sliceHeader(&pb)
-			h.Len = int(lumps[q1LumpPlanes].Size / 2)
-			h.Cap = h.Len
-			planes32 := *(*[]q1Plane)(unsafe.Pointer(&h))
-			planes = make([]Plane, 0, len(planes32))
-			for i := 0; i < cap(planes); i++ {
-				p := planes32[i]
-				planes = append(planes, Plane{
-					N: Vector3{
-						float64(p.N[0]),
-						float64(p.N[1]),
-						float64(p.N[2]),
-					},
-					D: float64(p.D),
-					T: PlaneType(p.T),
+	for i := 0; i < cap(planes); i++ {
+		p := planes32[i]
+		planes = append(planes, Plane{
+			N: Vector3{
+				float64(p.N[0]),
+				float64(p.N[1]),
+				float64(p.N[2]),
+			},
+			D: float64(p.D),
+			T: PlaneType(p.T),
+		})
+	}
+
+	return
+}
+
+func q1ReadEdgeIndices(b []byte) (edgeIndices []q1EdgeIndex, err error) {
+	h := sliceHeader(&b)
+	h.Len = len(b) / 4
+	h.Cap = h.Len
+	edgeIndices = *(*[]q1EdgeIndex)(unsafe.Pointer(&h))
+	return
+}
+
+func q1ReadVertices(b []byte) (vertices []Vector3, err error) {
+	h := sliceHeader(&b)
+	h.Len = len(b) / 12
+	h.Cap = h.Len
+	verts32 := *(*[][3]float32)(unsafe.Pointer(&h))
+	vertices = make([]Vector3, 0, len(verts32))
+
+	for i := 0; i < cap(vertices); i++ {
+		vertices = append(vertices, Vector3{
+			float64(verts32[i][0]),
+			float64(verts32[i][1]),
+			float64(verts32[i][2]),
+		})
+	}
+
+	return
+}
+
+func q1ReadFaceEdges(b []byte) (faceEdges []int16, err error) {
+	h := sliceHeader(&b)
+	h.Len = len(b) / 2
+	h.Cap = h.Len
+	faceEdges = *(*[]int16)(unsafe.Pointer(&h))
+	return
+}
+
+func q1ReadTextureInformation(b []byte) (texInfos []q1TexInfo, err error) {
+	h := sliceHeader(&b)
+	h.Len = len(b) / 40
+	h.Cap = h.Len
+	texInfos = *(*[]q1TexInfo)(unsafe.Pointer(&h))
+	return
+}
+
+func q1ReadFaces(b []byte, lumps []q1Lump, m *Model) (out []Face, err error) {
+	var (
+		edgeIndices []q1EdgeIndex
+		faceEdges   []int16
+		faces       []q1Face
+		planes      []Plane
+		texInfos    []q1TexInfo
+		verts       []Vector3
+	)
+
+	if planes, err = q1ReadPlanes(lumps[q1LumpPlanes].Data(b)); err != nil {
+		return
+	} else if verts, err = q1ReadVertices(lumps[q1LumpVertices].Data(b)); err != nil {
+		return
+	} else if texInfos, err = q1ReadTextureInformation(lumps[q1LumpTextureInformation].Data(b)); err != nil {
+		return
+	} else if edgeIndices, err = q1ReadEdgeIndices(lumps[q1LumpEdges].Data(b)); err != nil {
+		return
+	} else if faceEdges, err = q1ReadFaceEdges(lumps[q1LumpFaceEdgeTables].Data(b)); err != nil {
+		return
+	}
+
+	fb := lumps[q1LumpFaces].Data(b)
+	h := sliceHeader(&fb)
+	h.Len = int(lumps[q1LumpFaces].Size / 20)
+	h.Cap = h.Len
+	faces = *(*[]q1Face)(unsafe.Pointer(&h))
+
+	out = make([]Face, 0, len(faces))
+	for i := 0; i < cap(out); i++ {
+		face := faces[i]
+		edges := make([]Edge, 0, int(face.NumEdges))
+		fe := faceEdges[face.Edge : int(face.Edge)+cap(edges)]
+
+		for _, fei := range fe {
+			if fei < 0 {
+				edges = append(edges, Edge{
+					verts[edgeIndices[-fei].B],
+					verts[edgeIndices[-fei].A],
+				})
+			} else {
+				edges = append(edges, Edge{
+					verts[edgeIndices[fei].A],
+					verts[edgeIndices[fei].B],
 				})
 			}
 		}
 
-		// texture information
-		var texInfos []q1TexInfo
-		{
-			tb := lumps[q1LumpTextureInformation].Data(b)
-			h := sliceHeader(&tb)
-			h.Len = int(lumps[q1LumpTextureInformation].Size / 40)
-			h.Cap = h.Len
-			texInfos = *(*[]q1TexInfo)(unsafe.Pointer(&h))
+		ti := &texInfos[face.TexInfoID]
+		var flags TexFlags
+		if ti.Anim != 0 {
+			flags |= TexAnimated
 		}
+		s := Vector3{float64(ti.S[0]), float64(ti.S[1]), float64(ti.S[2])}
+		t := Vector3{float64(ti.T[0]), float64(ti.T[1]), float64(ti.T[2])}
 
-		// faces
-		var faces []q1Face
-		{
-			fb := lumps[q1LumpFaces].Data(b)
-			h := sliceHeader(&fb)
-			h.Len = int(lumps[q1LumpFaces].Size / 20)
-			h.Cap = h.Len
-			faces = *(*[]q1Face)(unsafe.Pointer(&h))
-		}
-
-		m.Faces = make([]Face, 0, len(faces))
-		for i := 0; i < cap(m.Faces); i++ {
-			face := faces[i]
-			fe := faceEdges[face.Edge : int(face.Edge)+int(face.NumEdges)]
-
-			edges := make([]Edge, int(face.NumEdges))
-			for e := 0; e < len(edges); e++ {
-				fei := fe[e]
-				if fei < 0 {
-					edges[e] = Edge{
-						verts[edgeIndices[-fei].B],
-						verts[edgeIndices[-fei].A],
-					}
-				} else {
-					edges[e] = Edge{
-						verts[edgeIndices[fei].A],
-						verts[edgeIndices[fei].B],
-					}
-				}
-			}
-
-			ti := &texInfos[face.TexInfoID]
-			var flags TexFlags
-			if ti.Anim != 0 {
-				flags |= TexAnimated
-			}
-			s := Vector3{float64(ti.S[0]), float64(ti.S[1]), float64(ti.S[2])}
-			t := Vector3{float64(ti.T[0]), float64(ti.T[1]), float64(ti.T[2])}
-
-			m.Faces = append(m.Faces, Face{
-				Edges: edges,
-				Front: face.Side == 0,
-				Plane: &planes[face.Plane],
-				TexInfo: TexInfo{
-					S:       s,
-					T:       t,
-					Ds:      float64(ti.Ds),
-					Dt:      float64(ti.Ds),
-					Texture: &m.Textures[ti.TexID],
-					Flags:   flags,
-				},
-			})
-		}
+		out = append(out, Face{
+			Edges: edges,
+			Front: face.Side == 0,
+			Plane: &planes[face.Plane],
+			TexInfo: TexInfo{
+				S:       s,
+				T:       t,
+				Ds:      float64(ti.Ds),
+				Dt:      float64(ti.Ds),
+				Texture: &m.Textures[ti.TexID],
+				Flags:   flags,
+			},
+		})
 	}
 
 	return
 }
 
 func q1ReadEntities(b []byte) (ents []Entity, err error) {
-	ents = make([]Entity, 256)
+	ents = make([]Entity, 0, 64)
 	ent := make(Entity)
 	inBlock := 0
 
@@ -333,9 +322,39 @@ func q1ReadTextures(b []byte) (texs []Texture, err error) {
 			Name:   string(bytes.ToLower(h[:nameLen])),
 			Width:  width,
 			Height: height,
-			data:   h[dataOffset : dataOffset+width*height],
+			Data:   h[dataOffset : dataOffset+width*height],
 		})
 	}
 
 	return
+}
+
+func Uint32(b []byte) int {
+	return int(binary.LittleEndian.Uint32(b))
+}
+
+func (lump q1Lump) String() string {
+	return fmt.Sprintf("{0x%x, 0x%x}", lump.Offset, lump.Size)
+}
+
+func (lump q1Lump) Data(b []byte) []byte {
+	offset := int(lump.Offset - 4)
+	return b[offset : offset+int(lump.Size)]
+}
+
+func sliceHeader(raw *[]byte) reflect.SliceHeader {
+	return *(*reflect.SliceHeader)(unsafe.Pointer(raw))
+}
+
+func stringHeader(raw *[]byte) reflect.StringHeader {
+	return *(*reflect.StringHeader)(unsafe.Pointer(raw))
+}
+
+func stringFrom(b []byte) string {
+	h := reflect.StringHeader{
+		Data: uintptr(unsafe.Pointer(&b[0])),
+		Len:  len(b),
+	}
+
+	return *(*string)(unsafe.Pointer(&h))
 }
