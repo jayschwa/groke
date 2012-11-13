@@ -281,10 +281,14 @@ func q1ReadEntities(b []byte) (ents []Entity, err error) {
 						err = fmt.Errorf("key not closed with doublequote")
 						break
 					}
-					value := stringFrom(b[i : i+valueIndex])
-					i += valueIndex + 1
 
-					ent[key] = value
+					if valueIndex == 0 {
+						ent[key] = ""
+					} else {
+						ent[key] = stringFrom(b[i : i+valueIndex])
+					}
+
+					i += valueIndex + 1
 					break
 				} else {
 					err = fmt.Errorf("bsp: unexpected char %q at pos %d", c, i)
@@ -300,21 +304,29 @@ func q1ReadEntities(b []byte) (ents []Entity, err error) {
 }
 
 func q1ReadTextures(b []byte) (texs []Texture, err error) {
-	numTex := Uint32(b)
+	numTex := int(Uint32(b))
 	texs = make([]Texture, 0, numTex)
 
 	for i := 0; i < cap(texs); i++ {
-		offset := Uint32(b[4+i*4:])
-		h := b[offset:]
+		var h []byte
+		if offset := Uint32(b[4+i*4:]); offset == 0xffffffff {
+			texs = append(texs, Texture{
+				Name: "",
+				Data: []byte{},
+			})
+			continue
+		} else {
+			h = b[offset:]
+		}
 
 		nameLen := bytes.IndexByte(h[:16], 0)
 		if nameLen < 0 || nameLen > 16 {
 			nameLen = 16
 		}
 
-		dataOffset := Uint32(h[24:])
-		width := Uint32(h[16:])
-		height := Uint32(h[20:])
+		dataOffset := int(Uint32(h[24:]))
+		width := int(Uint32(h[16:]))
+		height := int(Uint32(h[20:]))
 		texs = append(texs, Texture{
 			Name:   string(bytes.ToLower(h[:nameLen])),
 			Width:  width,
@@ -326,8 +338,8 @@ func q1ReadTextures(b []byte) (texs []Texture, err error) {
 	return
 }
 
-func Uint32(b []byte) int {
-	return int(binary.LittleEndian.Uint32(b))
+func Uint32(b []byte) uint32 {
+	return binary.LittleEndian.Uint32(b)
 }
 
 func (lump q1Lump) String() string {
