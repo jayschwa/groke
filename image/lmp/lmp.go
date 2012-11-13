@@ -13,7 +13,7 @@ import (
 	"io"
 )
 
-var palette color.Palette
+var Palette color.Palette
 
 var (
 	ErrFormat = errors.New("lmp: not a valid lmp file")
@@ -27,7 +27,7 @@ func Decode(r io.Reader) (outImage image.Image, err error) {
 			Pix:     b,
 			Stride:  w,
 			Rect:    rect,
-			Palette: palette,
+			Palette: Palette,
 		}
 	} else {
 		err = loadErr
@@ -50,10 +50,10 @@ func DecodeConfig(r io.Reader) (cfg image.Config, err error) {
 }
 
 func init() {
-	palette = make(color.Palette, 0, 256)
+	Palette = make(color.Palette, 0, 256)
 
 	for i := 0; i < 255; i++ {
-		palette = append(palette, color.NRGBA{
+		Palette = append(Palette, color.NRGBA{
 			R: QuakeDefaultPalette[i*3+0],
 			G: QuakeDefaultPalette[i*3+1],
 			B: QuakeDefaultPalette[i*3+2],
@@ -61,7 +61,7 @@ func init() {
 		})
 	}
 
-	palette = append(palette, color.NRGBA{0, 0, 0, 0})
+	Palette = append(Palette, color.NRGBA{0, 0, 0, 0})
 
 	image.RegisterFormat("lmp", "", Decode, DecodeConfig)
 }
@@ -95,7 +95,7 @@ func load(r io.Reader) (w, h int, b []byte, err error) {
 
 			// convert all black to transparent
 			for i := 0; i < w*h; i++ {
-				c := palette[b[i]].(color.NRGBA)
+				c := Palette[b[i]].(color.NRGBA)
 				if c.R == c.G && c.R == c.B && c.R == 0 {
 					b[i] = 255
 				}
