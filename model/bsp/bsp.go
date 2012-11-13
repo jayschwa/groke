@@ -3,6 +3,8 @@ package bsp
 import (
 	"bytes"
 	"errors"
+	"groke/image/lmp"
+	"image"
 	"io"
 )
 
@@ -115,4 +117,14 @@ func Read(r io.Reader, flags int) (mp *Model, err error) {
 	}
 
 	return
+}
+
+func (t *Texture) Image() image.Image {
+	rect := image.Rect(0, 0, t.Width, t.Height)
+	return &image.Paletted{
+		Pix:     t.Data,
+		Stride:  t.Width,
+		Rect:    rect,
+		Palette: lmp.Palette,
+	}
 }
