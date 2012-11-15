@@ -58,9 +58,9 @@ func TestLMP(t *testing.T) {
 						} else if err := encode(im, name+"_"+f.Name); err != nil {
 							t.Error(f.Name, err)
 						}
-					}
 
-					tested++
+						tested++
+					}
 				}
 			}
 
@@ -74,5 +74,5 @@ func TestLMP(t *testing.T) {
 		_ = <-status
 	}
 
-	t.Logf("tested %d wads", tested)
+	t.Logf("tested %d lmps", tested)
 }
