@@ -1,13 +1,13 @@
 package lmp
 
 import (
-	"groke/archive/wad"
+	"github.com/ftrvxmtrx/groke/archive/wad"
+	"github.com/ftrvxmtrx/tga"
 	"image"
 	"log"
 	"os"
 	"strings"
 	"testing"
-	"tga"
 )
 
 func encode(m image.Image, name string) (err error) {
