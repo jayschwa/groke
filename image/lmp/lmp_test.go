@@ -3,44 +3,76 @@ package lmp
 import (
 	"groke/archive/wad"
 	"image"
-	"image/png"
+	"log"
 	"os"
+	"strings"
 	"testing"
+	"tga"
 )
 
-func encode(name string, m image.Image) (err error) {
+func encode(m image.Image, name string) (err error) {
 	var f *os.File
 
-	if f, err = os.Create(name); err != nil {
+	if f, err = os.Create("testdata/" + name + ".tga"); err != nil {
 		return
 	}
 
 	defer f.Close()
-	err = png.Encode(f, m)
+	err = tga.Encode(f, m)
 
 	return
 }
 
 func TestLMP(t *testing.T) {
-	w, err := wad.OpenReader("test.wad")
+	f, err := os.Open("testdata")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
 
+	var names []string
+	names, err = f.Readdirnames(0)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	for _, f := range w.File {
-		r, err := f.Open()
-		if err != nil {
-			t.Error(f.Name, err)
-		}
+	status := make(chan int)
 
-		im, format, err := image.Decode(r)
-		if err != nil {
-			t.Error(f.Name, err)
-		} else if format != "lmp" {
-			t.Error(f.Name, "not lmp")
-		} else if err := encode(f.Name+".png", im); err != nil {
-			t.Error(f.Name, err)
-		}
+	var tested int
+	for _, name := range names {
+		go func(name string) {
+			if strings.HasSuffix(name, ".wad") {
+				log.Print(name)
+
+				w, err := wad.OpenReader("testdata/" + name)
+				if err == nil {
+					for _, f := range w.File {
+						r, err := f.Open()
+						if err != nil {
+							t.Error(f.Name, err)
+						}
+
+						im, err := Decode(r)
+						if err != nil {
+							t.Error(f.Name, err)
+						} else if err := encode(im, name+"_"+f.Name); err != nil {
+							t.Error(f.Name, err)
+						}
+					}
+
+					tested++
+				}
+			}
+
+			status <- 0
+		}(name)
 	}
+
+	t.Log("waiting...")
+
+	for _ = range names {
+		_ = <-status
+	}
+
+	t.Logf("tested %d wads", tested)
 }
