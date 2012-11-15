@@ -50,19 +50,7 @@ func DecodeConfig(r io.Reader) (cfg image.Config, err error) {
 }
 
 func init() {
-	Palette = make(color.Palette, 0, 256)
-
-	for i := 0; i < 255; i++ {
-		Palette = append(Palette, color.NRGBA{
-			R: QuakeDefaultPalette[i*3+0],
-			G: QuakeDefaultPalette[i*3+1],
-			B: QuakeDefaultPalette[i*3+2],
-			A: 0xff,
-		})
-	}
-
-	Palette = append(Palette, color.NRGBA{0, 0, 0, 0})
-
+	Palette = DefaultPalette
 	image.RegisterFormat("lmp", "", Decode, DecodeConfig)
 }
 
@@ -84,24 +72,20 @@ func load(r io.Reader) (w, h int, b []byte, err error) {
 	w = int(binary.LittleEndian.Uint32(b))
 	h = int(binary.LittleEndian.Uint32(b[4:]))
 
-	if size > 0 {
-		if w*h == size-8 {
-			// Quake image with header
-			b = b[8:]
-		} else if 128*128 == size {
-			// conchars, no header
-			w = 128
-			h = 128
+	if w*h >= size-8 {
+		// Quake image with header
+		b = b[8 : 8+w*h]
+	} else if 128*128 == size {
+		// conchars, no header
+		w = 128
+		h = 128
 
-			// convert all black to transparent
-			for i := 0; i < w*h; i++ {
-				c := Palette[b[i]].(color.NRGBA)
-				if c.R == c.G && c.R == c.B && c.R == 0 {
-					b[i] = 255
-				}
+		// convert all black to transparent
+		for i := 0; i < w*h; i++ {
+			c := Palette[b[i]].(color.NRGBA)
+			if c.R == c.G && c.R == c.B && c.R == 0 {
+				b[i] = 255
 			}
-		} else {
-			err = ErrFormat
 		}
 	} else {
 		err = ErrFormat
