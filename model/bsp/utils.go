@@ -28,6 +28,13 @@ func (lump bspLump) Data(headerLen uint32, b []byte) []byte {
 	return b[offset : offset+int(lump.Size)]
 }
 
+func bspLumpsFrom(b []byte, numLumps int) []bspLump {
+	h := sliceHeader(&b)
+	h.Len = numLumps
+	h.Cap = numLumps
+	return *(*[]bspLump)(unsafe.Pointer(&h))
+}
+
 func bspReadEntities(b []byte) (ents []Entity, err error) {
 	ents = make([]Entity, 0, 64)
 	ent := make(Entity)
