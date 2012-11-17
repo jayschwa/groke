@@ -1,3 +1,4 @@
+![logo](http://www.thechestnut.com/moomins/groke.jpg)
 # groke
 
 Something is going on here...
