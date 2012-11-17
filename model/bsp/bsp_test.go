@@ -37,8 +37,9 @@ func TestRead(t *testing.T) {
 
 	status := make(chan int)
 
-	var tested int
 	for _, name := range names {
+		var tested int
+
 		go func(name string) {
 			if strings.HasSuffix(name, ".bsp") {
 				f, err := os.Open("testdata/" + name)
@@ -75,14 +76,15 @@ func TestRead(t *testing.T) {
 				}
 			}
 
-			status <- 0
+			status <- tested
 		}(name)
 	}
 
 	t.Log("waiting...")
+	var tested int
 
 	for _ = range names {
-		_ = <-status
+		tested += <-status
 	}
 
 	t.Logf("tested %d maps", tested)
