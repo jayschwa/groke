@@ -1,8 +1,8 @@
 package bsp
 
 import (
+	"github.com/ftrvxmtrx/tga"
 	"image"
-	"image/png"
 	"log"
 	"os"
 	"strings"
@@ -12,12 +12,12 @@ import (
 func encode(m image.Image, name string) (err error) {
 	var f *os.File
 
-	if f, err = os.Create("testdata/" + name + ".png"); err != nil {
+	if f, err = os.Create("testdata/" + name + ".tga"); err != nil {
 		return
 	}
 
 	defer f.Close()
-	err = png.Encode(f, m)
+	err = tga.Encode(f, m)
 
 	return
 }
@@ -35,36 +35,54 @@ func TestRead(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	status := make(chan int)
+
 	var tested int
 	for _, name := range names {
-		if !strings.HasSuffix(name, ".bsp") {
-			continue
-		}
+		go func(name string) {
+			if strings.HasSuffix(name, ".bsp") {
+				f, err := os.Open("testdata/" + name)
+				if err != nil {
+					t.Fatal(err)
+				}
 
-		log.Print(name)
-		f, err = os.Open("testdata/" + name)
-		if err != nil {
-			t.Fatal(err)
-		}
+				var m *Model
+				m, err = Read(f, 0)
+				f.Close()
 
-		var m *Model
-		m, err = Read(f, 0)
-		f.Close()
+				if err == nil {
+					if m == nil {
+						t.Fatal(m)
+					}
 
-		if err != nil {
-			continue
-			//t.Fatal(err)
-		} else if m == nil {
-			t.Fatal(m)
-		}
+					log.Print(name)
+					for _, t := range m.Textures {
+						if t.Name != "" {
+							switch ds := t.DataSource.(type) {
+							case dataSourceInternal:
+								encode(ds.Image(), name+"_"+t.Name)
+							case dataSourceExternal:
+								// FIXME
+							default:
+								log.Fatal("unknown data source type")
+							}
+						}
+					}
 
-		for _, t := range m.Textures {
-			if t.Name != "" {
-				encode(t.Image(), name+"_"+t.Name)
+					tested++
+				} else {
+					log.Fatal(name, " - ", err)
+				}
 			}
-		}
 
-		tested++
+			status <- 0
+		}(name)
+	}
+
+	t.Log("waiting...")
+
+	for _ = range names {
+		_ = <-status
 	}
 
 	t.Logf("tested %d maps", tested)

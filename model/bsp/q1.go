@@ -2,11 +2,10 @@ package bsp
 
 import (
 	"bytes"
-	"encoding/binary"
-	"fmt"
+	"github.com/ftrvxmtrx/groke/image/lmp"
+	"image"
 	"io"
 	"io/ioutil"
-	"reflect"
 	"unsafe"
 )
 
@@ -18,18 +17,13 @@ type q1EdgeIndex struct {
 type q1Face struct {
 	Plane     uint16
 	Side      uint16
-	Edge      uint32
+	FirstEdge uint32
 	NumEdges  uint16
 	TexInfoID uint16
 	LightType uint8
 	LightBase uint8
 	Light     [2]uint8
 	LightMap  uint32
-}
-
-type q1Lump struct {
-	Offset uint32
-	Size   uint32
 }
 
 type q1Plane struct {
@@ -63,7 +57,10 @@ const (
 	q1LumpEdges
 	q1LumpFaceEdgeTables
 	q1LumpModels
+	q1NumLumps
 )
+
+const q1HeaderLen = 4
 
 func q1BSPRead(r io.Reader, flags int, m *Model) (err error) {
 	var b []byte
@@ -78,18 +75,18 @@ func q1BSPRead(r io.Reader, flags int, m *Model) (err error) {
 	}
 
 	h := sliceHeader(&b)
-	h.Len = 15
-	h.Cap = 15
-	lumps := *(*[]q1Lump)(unsafe.Pointer(&h))
+	h.Len = q1NumLumps
+	h.Cap = q1NumLumps
+	lumps := *(*[]bspLump)(unsafe.Pointer(&h))
 
 	// entities
-	m.Entities, err = q1ReadEntities(lumps[q1LumpEntities].Data(b))
+	m.Entities, err = bspReadEntities(lumps[q1LumpEntities].Data(q1HeaderLen, b))
 	if err != nil || flags&EntitiesOnly != 0 {
 		return
 	}
 
 	// textures
-	m.Textures, err = q1ReadTextures(lumps[q1LumpTextures].Data(b))
+	m.Textures, err = q1ReadTextures(lumps[q1LumpTextures].Data(q1HeaderLen, b))
 	if err != nil {
 		return
 	}
@@ -113,11 +110,7 @@ func q1ReadPlanes(b []byte) (planes []Plane, err error) {
 	for i := 0; i < cap(planes); i++ {
 		p := planes32[i]
 		planes = append(planes, Plane{
-			N: Vector3{
-				float64(p.N[0]),
-				float64(p.N[1]),
-				float64(p.N[2]),
-			},
+			N: qVector3(p.N),
 			D: float64(p.D),
 			T: PlaneType(p.T),
 		})
@@ -142,11 +135,7 @@ func q1ReadVertices(b []byte) (vertices []Vector3, err error) {
 	vertices = make([]Vector3, 0, len(verts32))
 
 	for i := 0; i < cap(vertices); i++ {
-		vertices = append(vertices, Vector3{
-			float64(verts32[i][0]),
-			float64(verts32[i][1]),
-			float64(verts32[i][2]),
-		})
+		vertices = append(vertices, qVector3(verts32[i]))
 	}
 
 	return
@@ -160,7 +149,7 @@ func q1ReadFaceEdges(b []byte) (faceEdges []int16, err error) {
 	return
 }
 
-func q1ReadTextureInformation(b []byte) (texInfos []q1TexInfo, err error) {
+func q1ReadTexInfo(b []byte) (texInfos []q1TexInfo, err error) {
 	h := sliceHeader(&b)
 	h.Len = len(b) / 40
 	h.Cap = h.Len
@@ -168,7 +157,7 @@ func q1ReadTextureInformation(b []byte) (texInfos []q1TexInfo, err error) {
 	return
 }
 
-func q1ReadFaces(b []byte, lumps []q1Lump, m *Model) (out []Face, err error) {
+func q1ReadFaces(b []byte, lumps []bspLump, m *Model) (out []Face, err error) {
 	var (
 		edgeIndices []q1EdgeIndex
 		faceEdges   []int16
@@ -178,19 +167,24 @@ func q1ReadFaces(b []byte, lumps []q1Lump, m *Model) (out []Face, err error) {
 		verts       []Vector3
 	)
 
-	if planes, err = q1ReadPlanes(lumps[q1LumpPlanes].Data(b)); err != nil {
+	data := make([][]byte, len(lumps))
+	for i := range data {
+		data[i] = lumps[i].Data(q1HeaderLen, b)
+	}
+
+	if planes, err = q1ReadPlanes(data[q1LumpPlanes]); err != nil {
 		return
-	} else if verts, err = q1ReadVertices(lumps[q1LumpVertices].Data(b)); err != nil {
+	} else if verts, err = q1ReadVertices(data[q1LumpVertices]); err != nil {
 		return
-	} else if texInfos, err = q1ReadTextureInformation(lumps[q1LumpTextureInformation].Data(b)); err != nil {
+	} else if texInfos, err = q1ReadTexInfo(data[q1LumpTextureInformation]); err != nil {
 		return
-	} else if edgeIndices, err = q1ReadEdgeIndices(lumps[q1LumpEdges].Data(b)); err != nil {
+	} else if edgeIndices, err = q1ReadEdgeIndices(data[q1LumpEdges]); err != nil {
 		return
-	} else if faceEdges, err = q1ReadFaceEdges(lumps[q1LumpFaceEdgeTables].Data(b)); err != nil {
+	} else if faceEdges, err = q1ReadFaceEdges(data[q1LumpFaceEdgeTables]); err != nil {
 		return
 	}
 
-	fb := lumps[q1LumpFaces].Data(b)
+	fb := lumps[q1LumpFaces].Data(q1HeaderLen, b)
 	h := sliceHeader(&fb)
 	h.Len = int(lumps[q1LumpFaces].Size / 20)
 	h.Cap = h.Len
@@ -200,7 +194,7 @@ func q1ReadFaces(b []byte, lumps []q1Lump, m *Model) (out []Face, err error) {
 	for i := 0; i < cap(out); i++ {
 		face := faces[i]
 		edges := make([]Edge, 0, int(face.NumEdges))
-		fe := faceEdges[face.Edge : int(face.Edge)+cap(edges)]
+		fe := faceEdges[face.FirstEdge : int(face.FirstEdge)+cap(edges)]
 
 		for _, fei := range fe {
 			if fei < 0 {
@@ -221,8 +215,8 @@ func q1ReadFaces(b []byte, lumps []q1Lump, m *Model) (out []Face, err error) {
 		if ti.Anim != 0 {
 			flags |= TexAnimated
 		}
-		s := Vector3{float64(ti.S[0]), float64(ti.S[1]), float64(ti.S[2])}
-		t := Vector3{float64(ti.T[0]), float64(ti.T[1]), float64(ti.T[2])}
+		s := qVector3(ti.S)
+		t := qVector3(ti.T)
 
 		out = append(out, Face{
 			Edges: edges,
@@ -242,67 +236,6 @@ func q1ReadFaces(b []byte, lumps []q1Lump, m *Model) (out []Face, err error) {
 	return
 }
 
-func q1ReadEntities(b []byte) (ents []Entity, err error) {
-	ents = make([]Entity, 0, 64)
-	ent := make(Entity)
-	inBlock := 0
-
-	for i := 0; i < len(b); {
-		c := b[i]
-		i++
-
-		if c == '{' {
-			inBlock++
-		} else if c == '}' {
-			if inBlock == 1 {
-				ents = append(ents, ent)
-				ent = make(Entity)
-			}
-
-			inBlock--
-		} else if c == '"' && inBlock == 1 {
-			keyIndex := bytes.IndexByte(b[i:], '"')
-			if keyIndex < 0 {
-				err = fmt.Errorf("key not closed with doublequote")
-				break
-			}
-			key := stringFrom(b[i : i+keyIndex])
-			i += keyIndex + 1
-
-			for i < len(b) {
-				c = b[i]
-				i++
-
-				if c == ' ' || c == '\t' {
-					continue
-				} else if c == '"' {
-					valueIndex := bytes.IndexByte(b[i:], '"')
-					if valueIndex < 0 {
-						err = fmt.Errorf("key not closed with doublequote")
-						break
-					}
-
-					if valueIndex == 0 {
-						ent[key] = ""
-					} else {
-						ent[key] = stringFrom(b[i : i+valueIndex])
-					}
-
-					i += valueIndex + 1
-					break
-				} else {
-					err = fmt.Errorf("bsp: unexpected char %q at pos %d", c, i)
-				}
-			}
-		} else if c != ' ' && c != '\t' && c != '\r' && c != '\n' && c != 0 {
-			err = fmt.Errorf("bsp: unexpected char %q at pos %d", c, i)
-			return
-		}
-	}
-
-	return
-}
-
 func q1ReadTextures(b []byte) (texs []Texture, err error) {
 	numTex := int(Uint32(b))
 	texs = make([]Texture, 0, numTex)
@@ -311,8 +244,8 @@ func q1ReadTextures(b []byte) (texs []Texture, err error) {
 		var h []byte
 		if offset := Uint32(b[4+i*4:]); offset == 0xffffffff {
 			texs = append(texs, Texture{
-				Name: "",
-				Data: []byte{},
+				Name:       "",
+				DataSource: dataSourceInternal{},
 			})
 			continue
 		} else {
@@ -328,42 +261,25 @@ func q1ReadTextures(b []byte) (texs []Texture, err error) {
 		width := int(Uint32(h[16:]))
 		height := int(Uint32(h[20:]))
 		texs = append(texs, Texture{
-			Name:   string(bytes.ToLower(h[:nameLen])),
-			Width:  width,
-			Height: height,
-			Data:   h[dataOffset : dataOffset+width*height],
+			Name: string(bytes.ToLower(h[:nameLen])),
+			DataSource: dataSourceInternal{
+				h[dataOffset : dataOffset+width*height],
+				width,
+				height,
+				lmpToImage,
+			},
 		})
 	}
 
 	return
 }
 
-func Uint32(b []byte) uint32 {
-	return binary.LittleEndian.Uint32(b)
-}
-
-func (lump q1Lump) String() string {
-	return fmt.Sprintf("{0x%x, 0x%x}", lump.Offset, lump.Size)
-}
-
-func (lump q1Lump) Data(b []byte) []byte {
-	offset := int(lump.Offset - 4)
-	return b[offset : offset+int(lump.Size)]
-}
-
-func sliceHeader(raw *[]byte) reflect.SliceHeader {
-	return *(*reflect.SliceHeader)(unsafe.Pointer(raw))
-}
-
-func stringHeader(raw *[]byte) reflect.StringHeader {
-	return *(*reflect.StringHeader)(unsafe.Pointer(raw))
-}
-
-func stringFrom(b []byte) string {
-	h := reflect.StringHeader{
-		Data: uintptr(unsafe.Pointer(&b[0])),
-		Len:  len(b),
+func lmpToImage(w, h int, data []byte) image.Image {
+	rect := image.Rect(0, 0, w, h)
+	return &image.Paletted{
+		Pix:     data,
+		Stride:  w,
+		Rect:    rect,
+		Palette: lmp.Palette,
 	}
-
-	return *(*string)(unsafe.Pointer(&h))
 }

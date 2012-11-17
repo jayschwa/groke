@@ -3,7 +3,6 @@ package bsp
 import (
 	"bytes"
 	"errors"
-	"groke/image/lmp"
 	"image"
 	"io"
 )
@@ -20,11 +19,48 @@ type Plane struct {
 
 type Edge [2]Vector3
 
+type DataSource interface {
+	External() bool
+}
+
+type dataSourceExternal struct {
+}
+
+func (s dataSourceExternal) External() bool {
+	return true
+}
+
+type dataSourceInternal struct {
+	data        []byte
+	width       int
+	height      int
+	dataToImage func(w, h int, data []byte) image.Image
+}
+
+func (s dataSourceInternal) External() bool {
+	return false
+}
+
+func (s dataSourceInternal) Width() int {
+	return s.width
+}
+
+func (s dataSourceInternal) Height() int {
+	return s.height
+}
+
+func (s dataSourceInternal) Data() []byte {
+	return s.data
+}
+
+func (s dataSourceInternal) Image() image.Image {
+	return s.dataToImage(s.width, s.height, s.data)
+}
+
 type Texture struct {
-	Name   string
-	Width  int
-	Height int
-	Data   []byte
+	DataSource
+	Name string
+	Next *Texture
 }
 
 type TexInfo struct {
@@ -88,7 +124,8 @@ const (
 )
 
 var bspLoaders = []*bspLoader{
-	{[]byte{29, 0, 0, 0}, q1BSPRead},
+	{[]byte{0x1d, 0x00, 0x00, 0x00}, q1BSPRead},
+	{[]byte{'I', 'B', 'S', 'P', 0x26, 0x00, 0x00, 0x00}, q2BSPRead},
 }
 
 var (
@@ -108,6 +145,16 @@ func Read(r io.Reader, flags int) (mp *Model, err error) {
 	err = ErrFormat
 
 	for _, bh := range bspLoaders {
+		if len(bh.id) > len(id) {
+			bigger := make([]byte, len(bh.id))
+			copy(bigger, id)
+			if _, err := r.Read(bigger[len(id):]); err != nil {
+				break
+			} else {
+				id = bigger
+			}
+		}
+
 		if bytes.Compare(id, bh.id) == 0 {
 			var m Model
 			err = bh.read(r, flags, &m)
@@ -117,14 +164,4 @@ func Read(r io.Reader, flags int) (mp *Model, err error) {
 	}
 
 	return
-}
-
-func (t *Texture) Image() image.Image {
-	rect := image.Rect(0, 0, t.Width, t.Height)
-	return &image.Paletted{
-		Pix:     t.Data,
-		Stride:  t.Width,
-		Rect:    rect,
-		Palette: lmp.Palette,
-	}
 }
