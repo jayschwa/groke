@@ -18,7 +18,7 @@ func (lump bspLump) String() string {
 }
 
 func (lump bspLump) Data(headerLen uint32, b []byte) []byte {
-	if lump.Size == 0 {
+	if lump.Offset == 0 || lump.Size == 0 {
 		return []byte{}
 	}
 	offset := int(lump.Offset - headerLen)

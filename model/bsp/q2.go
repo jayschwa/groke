@@ -110,7 +110,7 @@ func q2ReadTexInfo(b []byte) (texInfos []q2TexInfo, err error) {
 func q2ReadFaces(b []byte, lumps []bspLump, m *Model) (out []Face, err error) {
 	var (
 		edgeIndices []q1EdgeIndex
-		faceEdges   []int16
+		faceEdges   []int32
 		faces       []q2Face
 		planes      []Plane
 		texInfos    []q2TexInfo
@@ -193,6 +193,7 @@ func q2ReadFaces(b []byte, lumps []bspLump, m *Model) (out []Face, err error) {
 
 		out = append(out, Face{
 			Plane: &planes[face.Plane],
+			Edges: edges,
 			TexInfo: TexInfo{
 				S:       s,
 				T:       t,

@@ -74,7 +74,7 @@ func q1BSPRead(r io.Reader, flags int, m *Model) (err error) {
 		return
 	}
 
-	lumps := bspLumpsFrom(b, q2NumLumps)
+	lumps := bspLumpsFrom(b, q1NumLumps)
 
 	// entities
 	m.Entities, err = bspReadEntities(lumps[q1LumpEntities].Data(q1HeaderLen, b))
@@ -138,11 +138,11 @@ func q1ReadVertices(b []byte) (vertices []Vector3, err error) {
 	return
 }
 
-func q1ReadFaceEdges(b []byte) (faceEdges []int16, err error) {
+func q1ReadFaceEdges(b []byte) (faceEdges []int32, err error) {
 	h := sliceHeader(&b)
-	h.Len = len(b) / 2
+	h.Len = len(b) / 4
 	h.Cap = h.Len
-	faceEdges = *(*[]int16)(unsafe.Pointer(&h))
+	faceEdges = *(*[]int32)(unsafe.Pointer(&h))
 	return
 }
 
@@ -157,7 +157,7 @@ func q1ReadTexInfo(b []byte) (texInfos []q1TexInfo, err error) {
 func q1ReadFaces(b []byte, lumps []bspLump, m *Model) (out []Face, err error) {
 	var (
 		edgeIndices []q1EdgeIndex
-		faceEdges   []int16
+		faceEdges   []int32
 		faces       []q1Face
 		planes      []Plane
 		texInfos    []q1TexInfo
