@@ -96,6 +96,8 @@ const (
 	SurfFlowing
 	// Do not draw.
 	SurfNoDraw
+	SurfHint
+	SurfSkip
 )
 
 var surfFlagsStr = map[SurfFlags]string{
@@ -107,6 +109,8 @@ var surfFlagsStr = map[SurfFlags]string{
 	SurfTrans66: "Trans66",
 	SurfFlowing: "Flowing",
 	SurfNoDraw:  "NoDraw",
+	SurfHint:    "Hint",
+	SurfSkip:    "Skip",
 }
 
 type WAL struct {
