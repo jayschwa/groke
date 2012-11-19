@@ -242,7 +242,7 @@ func q1ReadTextures(b []byte) (texs []Texture, err error) {
 
 	for i := 0; i < cap(texs); i++ {
 		var h []byte
-		if offset := Uint32(b[4+i*4:]); offset == 0xffffffff {
+		if offset := Uint32(b[4+i*4:]); offset == 0xffffffff || offset == 0 {
 			texs = append(texs, Texture{
 				Name:       "",
 				DataSource: dataSourceInternal{},
