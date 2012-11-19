@@ -97,7 +97,7 @@ func initScene() {
 func perspective(fov, aspect, zNear, zFar gl.Double) {
 	var xmin, xmax, ymin, ymax gl.Double
 
-	ymax = zNear * gl.Double(math.Tan(float64(fov*3.14/360.0)))
+	ymax = zNear * gl.Double(math.Tan(float64(fov*math.Pi/360.0)))
 	ymin = -ymax
 
 	xmin = ymin * aspect
@@ -195,19 +195,24 @@ func drawScene() {
 
 	var r, g, b gl.Ubyte
 
-	gl.Begin(gl.LINES)
 	for i, face := range model.Faces {
-		for _, edge := range face.Edges {
-			r = gl.Ubyte(i)
-			g = gl.Ubyte(i >> 2)
-			b = gl.Ubyte(i >> 4)
+		r = gl.Ubyte(i) + 100
+		g = gl.Ubyte(i>>1) + 100
+		b = gl.Ubyte(i>>2) + 100
 
-			gl.Color4ub(r, g, b, 0xff)
-			gl.Vertex3d(gl.Double(edge[0][0]), gl.Double(edge[0][1]), gl.Double(edge[0][2]))
-			gl.Vertex3d(gl.Double(edge[1][0]), gl.Double(edge[1][1]), gl.Double(edge[1][2]))
+		if model.Triangle {
+			gl.Begin(gl.TRIANGLES)
+		} else {
+			gl.Begin(gl.LINES)
 		}
+
+		gl.Color4ub(r, g, b, 0xff)
+		for _, v := range face.Verts {
+			gl.Vertex3d(gl.Double(v.Pos[0]), gl.Double(v.Pos[1]), gl.Double(v.Pos[2]))
+		}
+
+		gl.End()
 	}
-	gl.End()
 }
 
 func readModel() error {

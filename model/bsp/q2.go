@@ -166,21 +166,24 @@ func q2ReadFaces(b []byte, lumps []bspLump, m *Model) (out []Face, err error) {
 	faces = *(*[]q2Face)(unsafe.Pointer(&h))
 
 	out = make([]Face, 0, len(faces))
-	for i := 0; i < cap(out); i++ {
-		face := faces[i]
-		edges := make([]Edge, 0, int(face.NumEdges))
-		fe := faceEdges[face.FirstEdge : int(face.FirstEdge)+cap(edges)]
+	for _, face := range faces {
+		v := make([]Vert, 0, int(face.NumEdges)*2)
+		fe := faceEdges[face.FirstEdge : int(face.FirstEdge)+int(face.NumEdges)]
 
 		for _, fei := range fe {
 			if fei < 0 {
-				edges = append(edges, Edge{
-					verts[edgeIndices[-fei].B],
-					verts[edgeIndices[-fei].A],
+				v = append(v, Vert{
+					Pos: verts[edgeIndices[-fei].B],
+				})
+				v = append(v, Vert{
+					Pos: verts[edgeIndices[-fei].A],
 				})
 			} else {
-				edges = append(edges, Edge{
-					verts[edgeIndices[fei].A],
-					verts[edgeIndices[fei].B],
+				v = append(v, Vert{
+					Pos: verts[edgeIndices[fei].A],
+				})
+				v = append(v, Vert{
+					Pos: verts[edgeIndices[fei].B],
 				})
 			}
 		}
@@ -193,7 +196,7 @@ func q2ReadFaces(b []byte, lumps []bspLump, m *Model) (out []Face, err error) {
 
 		out = append(out, Face{
 			Plane: &planes[face.Plane],
-			Edges: edges,
+			Verts: v,
 			TexInfo: TexInfo{
 				S:       s,
 				T:       t,

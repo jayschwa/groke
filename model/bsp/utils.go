@@ -23,7 +23,7 @@ func (lump bspLump) Data(headerLen uint32, b []byte) []byte {
 	}
 	offset := int(lump.Offset - headerLen)
 	if len(b) < offset+int(lump.Size) {
-		panic(fmt.Sprintf("lump data out of range (offset=%d, size=%d, requested [%d:%d])", lump.Offset, lump.Size, offset, offset+int(lump.Size)))
+		panic(fmt.Sprintf("lump data out of range (offset=%x, size=%x, requested [%x:%x])", lump.Offset, lump.Size, offset, offset+int(lump.Size)))
 	}
 	return b[offset : offset+int(lump.Size)]
 }

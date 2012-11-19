@@ -99,7 +99,7 @@ func q1BSPRead(r io.Reader, flags int, m *Model) (err error) {
 
 func q1ReadPlanes(b []byte) (planes []Plane, err error) {
 	h := sliceHeader(&b)
-	h.Len = len(b) / 2
+	h.Len = len(b) / 20
 	h.Cap = h.Len
 	planes32 := *(*[]q1Plane)(unsafe.Pointer(&h))
 	planes = make([]Plane, 0, len(planes32))
@@ -188,21 +188,24 @@ func q1ReadFaces(b []byte, lumps []bspLump, m *Model) (out []Face, err error) {
 	faces = *(*[]q1Face)(unsafe.Pointer(&h))
 
 	out = make([]Face, 0, len(faces))
-	for i := 0; i < cap(out); i++ {
-		face := faces[i]
-		edges := make([]Edge, 0, int(face.NumEdges))
-		fe := faceEdges[face.FirstEdge : int(face.FirstEdge)+cap(edges)]
+	for _, face := range faces {
+		v := make([]Vert, 0, int(face.NumEdges)*2)
+		fe := faceEdges[face.FirstEdge : int(face.FirstEdge)+int(face.NumEdges)]
 
 		for _, fei := range fe {
 			if fei < 0 {
-				edges = append(edges, Edge{
-					verts[edgeIndices[-fei].B],
-					verts[edgeIndices[-fei].A],
+				v = append(v, Vert{
+					Pos: verts[edgeIndices[-fei].B],
+				})
+				v = append(v, Vert{
+					Pos: verts[edgeIndices[-fei].A],
 				})
 			} else {
-				edges = append(edges, Edge{
-					verts[edgeIndices[fei].A],
-					verts[edgeIndices[fei].B],
+				v = append(v, Vert{
+					Pos: verts[edgeIndices[fei].A],
+				})
+				v = append(v, Vert{
+					Pos: verts[edgeIndices[fei].B],
 				})
 			}
 		}
@@ -216,7 +219,7 @@ func q1ReadFaces(b []byte, lumps []bspLump, m *Model) (out []Face, err error) {
 		t := qVector3(ti.T)
 
 		out = append(out, Face{
-			Edges: edges,
+			Verts: v,
 			Front: face.Side == 0,
 			Plane: &planes[face.Plane],
 			TexInfo: TexInfo{

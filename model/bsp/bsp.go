@@ -17,8 +17,6 @@ type Plane struct {
 	T PlaneType
 }
 
-type Edge [2]Vector3
-
 type DataSource interface {
 	External() bool
 }
@@ -74,14 +72,19 @@ type TexInfo struct {
 
 type Entity map[string]string
 
+type Vert struct {
+	Pos Vector3
+}
+
 type Face struct {
-	Edges   []Edge
+	Verts   []Vert
 	Front   bool
 	Plane   *Plane
 	TexInfo TexInfo
 }
 
 type Model struct {
+	Triangle bool // FIXME -- Q3 uses triangles
 	Entities []Entity
 	Faces    []Face
 	TexInfos []TexInfo
@@ -102,6 +105,7 @@ var pt2String = []string{
 	"PlaneNonAxialX",
 	"PlaneNonAxialY",
 	"PlaneNonAxialZ",
+	"PlaneNoType",
 }
 
 const (
@@ -111,6 +115,7 @@ const (
 	PlaneNonAxialX
 	PlaneNonAxialY
 	PlaneNonAxialZ
+	PlaneNoType
 )
 
 const (
@@ -126,6 +131,7 @@ const (
 var bspLoaders = []*bspLoader{
 	{[]byte{0x1d, 0x00, 0x00, 0x00}, q1BSPRead},
 	{[]byte{'I', 'B', 'S', 'P', 0x26, 0x00, 0x00, 0x00}, q2BSPRead},
+	{[]byte{'I', 'B', 'S', 'P', 0x2e, 0x00, 0x00, 0x00}, q3BSPRead},
 }
 
 var (
