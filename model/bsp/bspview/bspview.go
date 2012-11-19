@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"flag"
 	gl "github.com/chsc/gogl/gl21"
 	"github.com/ftrvxmtrx/groke/model/bsp"
 	"github.com/jteeuwen/glfw"
@@ -10,6 +11,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"runtime/pprof"
 )
 
 const (
@@ -37,7 +39,21 @@ var (
 	model               *bsp.Model
 )
 
+var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
+
 func main() {
+	flag.Parse()
+
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
+
 	if err := readModel(); err != nil {
 		log.Fatal(err)
 	}
@@ -216,11 +232,11 @@ func drawScene() {
 }
 
 func readModel() error {
-	if len(os.Args) != 2 {
-		return errors.New("usage: bspview FILE")
+	if len(os.Args) < 2 {
+		return errors.New("usage: bspview [options...] FILE")
 	}
 
-	f, err := os.Open(os.Args[1])
+	f, err := os.Open(os.Args[len(os.Args)-1])
 	if err != nil {
 		return err
 	}

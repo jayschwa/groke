@@ -2,3 +2,5 @@
 *.wad
 *.pak
 testdata
+*.test
+*.prof
