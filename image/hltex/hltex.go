@@ -1,6 +1,7 @@
 package hltex
 
 import (
+	"bytes"
 	. "encoding/binary"
 	"errors"
 	"image"
@@ -12,6 +13,11 @@ var (
 	ErrFormat = errors.New("hltex: not a valid Half-Life texture")
 )
 
+type HLTex struct {
+	image.Image
+	Name string
+}
+
 // Decode decodes a Half-Life image.
 func Decode(r io.Reader) (outImage image.Image, err error) {
 	b := make([]byte, 40)
@@ -20,9 +26,15 @@ func Decode(r io.Reader) (outImage image.Image, err error) {
 		return
 	}
 
+	name := string(bytes.ToLower(b[:bytes.IndexByte(b[:16], 0)]))
 	width := int(LittleEndian.Uint32(b[16:]))
 	height := int(LittleEndian.Uint32(b[20:]))
 	dataOff := int(LittleEndian.Uint32(b[24:]))
+
+	if dataOff < len(b) {
+		err = ErrFormat
+		return
+	}
 
 	var palOff int
 
@@ -69,11 +81,14 @@ func Decode(r io.Reader) (outImage image.Image, err error) {
 		palette = append(palette, color.NRGBA{0, 0, 0, 0})
 	}
 
-	outImage = &image.Paletted{
-		Pix:     b[dataOff : dataOff+width*height],
-		Stride:  width,
-		Rect:    image.Rect(0, 0, width, height),
-		Palette: palette,
+	outImage = &HLTex{
+		&image.Paletted{
+			Pix:     b[dataOff : dataOff+width*height],
+			Stride:  width,
+			Rect:    image.Rect(0, 0, width, height),
+			Palette: palette,
+		},
+		name,
 	}
 
 	return
