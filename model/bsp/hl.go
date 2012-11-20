@@ -2,8 +2,8 @@ package bsp
 
 import (
 	"bytes"
+	"github.com/ftrvxmtrx/groke/image/hltex"
 	"image"
-	"image/color"
 	"io"
 	"io/ioutil"
 	"unsafe"
@@ -162,78 +162,35 @@ func hlReadTextures(b []byte) (texs []Texture, err error) {
 	texs = make([]Texture, 0, numTex)
 
 	for i := 0; i < cap(texs); i++ {
-		var h []byte
 		if offset := Uint32(b[4+i*4:]); offset == 0xffffffff || offset == 0 {
 			texs = append(texs, Texture{
 				Name:       "",
 				DataSource: dataSourceInternal{},
 			})
-			continue
 		} else {
-			h = b[offset:]
-		}
+			r := bytes.NewBuffer(b[offset:])
 
-		nameLen := bytes.IndexByte(h[:16], 0)
-		if nameLen < 0 || nameLen > 16 {
-			nameLen = 16
-		}
-		name := string(bytes.ToLower(h[:nameLen]))
+			var im image.Image
+			if im, err = hltex.Decode(r); err != nil {
+				return
+			}
+			hlt := im.(*hltex.HLTex)
 
-		dataOffset := int(Uint32(h[24:]))
-		width := int(Uint32(h[16:]))
-		height := int(Uint32(h[20:]))
-
-		if dataOffset > 0 {
-			var palOffset int
-			var dataEnd int
-			if palOffset = int(Uint32(h[36:])); palOffset != 0 {
-				palOffset += width * height / 64
-			} else if palOffset = int(Uint32(h[32:])); palOffset != 0 {
-				palOffset += width * height / 16
-			} else if palOffset = int(Uint32(h[28:])); palOffset != 0 {
-				palOffset += width * height / 4
+			var source DataSource
+			if hlt.Image.(*image.Paletted).Pix == nil {
+				source = dataSourceExternal{}
 			} else {
-				palOffset = dataOffset + width*height
+				source = dataSourceInternal{
+					hlt.Image,
+				}
 			}
 
-			palOffset += 2
-			dataEnd = palOffset + 256*3
-
 			texs = append(texs, Texture{
-				Name: name,
-				DataSource: dataSourceInternal{
-					h[dataOffset:dataEnd],
-					width,
-					height,
-					hlTexToImage,
-				},
-			})
-		} else {
-			texs = append(texs, Texture{
-				Name:       name,
-				DataSource: dataSourceExternal{},
+				Name:       hlt.Name,
+				DataSource: source,
 			})
 		}
 	}
 
 	return
-}
-
-func hlTexToImage(w, h int, data []byte) image.Image {
-	palette := make(color.Palette, 0)
-	palOffset := len(data) - 256*3
-
-	for i := 0; i < 255; i++ {
-		o := i * 3
-		palette = append(palette, color.NRGBA{data[palOffset+o+0], data[palOffset+o+1], data[palOffset+o+3], 0xff})
-	}
-	palette = append(palette, color.NRGBA{0, 0, 0, 0})
-
-	rect := image.Rect(0, 0, w, h)
-	return &image.Paletted{
-		Pix:     data,
-		Stride:  w,
-		Rect:    rect,
-		Palette: palette,
-	}
 }

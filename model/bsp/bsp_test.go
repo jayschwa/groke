@@ -61,7 +61,7 @@ func TestRead(t *testing.T) {
 						if t.Name != "" {
 							switch ds := t.DataSource.(type) {
 							case dataSourceInternal:
-								encode(ds.Image(), name+"_"+t.Name)
+								encode(ds.Image, name+"_"+t.Name)
 							case dataSourceExternal:
 								// FIXME
 							default:

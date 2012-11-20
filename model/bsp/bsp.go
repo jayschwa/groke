@@ -29,30 +29,11 @@ func (s dataSourceExternal) External() bool {
 }
 
 type dataSourceInternal struct {
-	data        []byte
-	width       int
-	height      int
-	dataToImage func(w, h int, data []byte) image.Image
+	image.Image
 }
 
 func (s dataSourceInternal) External() bool {
 	return false
-}
-
-func (s dataSourceInternal) Width() int {
-	return s.width
-}
-
-func (s dataSourceInternal) Height() int {
-	return s.height
-}
-
-func (s dataSourceInternal) Data() []byte {
-	return s.data
-}
-
-func (s dataSourceInternal) Image() image.Image {
-	return s.dataToImage(s.width, s.height, s.data)
 }
 
 type Texture struct {

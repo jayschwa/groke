@@ -263,23 +263,15 @@ func q1ReadTextures(b []byte) (texs []Texture, err error) {
 		texs = append(texs, Texture{
 			Name: string(bytes.ToLower(h[:nameLen])),
 			DataSource: dataSourceInternal{
-				h[dataOffset : dataOffset+width*height],
-				width,
-				height,
-				lmpToImage,
+				&image.Paletted{
+					Pix:     h[dataOffset : dataOffset+width*height],
+					Stride:  width,
+					Rect:    image.Rect(0, 0, width, height),
+					Palette: lmp.Palette,
+				},
 			},
 		})
 	}
 
 	return
-}
-
-func lmpToImage(w, h int, data []byte) image.Image {
-	rect := image.Rect(0, 0, w, h)
-	return &image.Paletted{
-		Pix:     data,
-		Stride:  w,
-		Rect:    rect,
-		Palette: lmp.Palette,
-	}
 }
