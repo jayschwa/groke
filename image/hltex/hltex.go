@@ -31,7 +31,18 @@ func Decode(r io.Reader) (outImage image.Image, err error) {
 	height := int(LittleEndian.Uint32(b[20:]))
 	dataOff := int(LittleEndian.Uint32(b[24:]))
 
-	if dataOff < len(b) {
+	if dataOff == 0 {
+		outImage = &HLTex{
+			&image.Paletted{
+				Pix:     nil,
+				Stride:  width,
+				Rect:    image.Rect(0, 0, width, height),
+				Palette: nil,
+			},
+			name,
+		}
+		return
+	} else if dataOff < len(b) {
 		err = ErrFormat
 		return
 	}
