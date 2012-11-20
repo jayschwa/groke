@@ -1,7 +1,6 @@
 package hltex
 
 import (
-	"bytes"
 	. "encoding/binary"
 	"errors"
 	"image"
@@ -15,26 +14,15 @@ var (
 
 // Decode decodes a Half-Life image.
 func Decode(r io.Reader) (outImage image.Image, err error) {
-	var data bytes.Buffer
+	b := make([]byte, 40)
 
-	if _, err = data.ReadFrom(r); err != nil {
+	if _, err = io.ReadFull(r, b); err != nil {
 		return
 	}
 
-	b := data.Bytes()
-	size := len(b)
-
-	if size < 24 {
-		err = ErrFormat
-		return
-	}
-
-	//nameLen := bytes.IndexByte(b[:16], 0)
-	//name := string(bytes.ToLower(b[:nameLen]))
-
-	dataOff := int(LittleEndian.Uint32(b[24:]))
 	width := int(LittleEndian.Uint32(b[16:]))
 	height := int(LittleEndian.Uint32(b[20:]))
+	dataOff := int(LittleEndian.Uint32(b[24:]))
 
 	var palOff int
 
@@ -48,8 +36,25 @@ func Decode(r io.Reader) (outImage image.Image, err error) {
 		palOff = dataOff + width*height
 	}
 
+	dataOff -= len(b)
+	palOff -= len(b)
+
+	var size int
+	b = make([]byte, palOff+2+256*3)
+	if size, err = r.Read(b); err != nil {
+		return
+	} else if size < palOff+2 {
+		err = ErrFormat
+		return
+	}
+
 	palSize := int(LittleEndian.Uint16(b[palOff:]))
 	palOff += 2
+	if palSize > 256 || size < palOff+palSize {
+		err = ErrFormat
+		return
+	}
+
 	palette := make(color.Palette, 0)
 	for i := 0; i < palSize; i++ {
 		o := i * 3
@@ -79,7 +84,7 @@ func Decode(r io.Reader) (outImage image.Image, err error) {
 func DecodeConfig(r io.Reader) (cfg image.Config, err error) {
 	var b [24]byte
 
-	if _, err = r.Read(b[:]); err == nil {
+	if _, err = io.ReadFull(r, b[:]); err == nil {
 		cfg.Width = int(LittleEndian.Uint32(b[16:]))
 		cfg.Height = int(LittleEndian.Uint32(b[20:]))
 	}
