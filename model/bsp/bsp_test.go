@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -35,12 +36,13 @@ func TestRead(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	status := make(chan int)
+	group := new(sync.WaitGroup)
+	group.Add(len(names))
 
 	for _, name := range names {
-		var tested int
-
 		go func(name string) {
+			defer group.Done()
+
 			if strings.HasSuffix(name, ".bsp") {
 				f, err := os.Open("testdata/" + name)
 				if err != nil {
@@ -69,23 +71,12 @@ func TestRead(t *testing.T) {
 							}
 						}
 					}
-
-					tested++
 				} else {
 					log.Fatal(name, " - ", err)
 				}
 			}
-
-			status <- tested
 		}(name)
 	}
 
-	t.Log("waiting...")
-	var tested int
-
-	for _ = range names {
-		tested += <-status
-	}
-
-	t.Logf("tested %d maps", tested)
+	group.Wait()
 }

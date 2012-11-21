@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -36,11 +37,13 @@ func TestLMP(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	status := make(chan int)
+	group := new(sync.WaitGroup)
+	group.Add(len(names))
 
-	var tested int
 	for _, name := range names {
 		go func(name string) {
+			defer group.Done()
+
 			if strings.HasSuffix(name, ".wad") {
 				log.Print(name)
 
@@ -58,21 +61,11 @@ func TestLMP(t *testing.T) {
 						} else if err := encode(im, name+"_"+f.Name); err != nil {
 							t.Error(f.Name, err)
 						}
-
-						tested++
 					}
 				}
 			}
-
-			status <- 0
 		}(name)
 	}
 
-	t.Log("waiting...")
-
-	for _ = range names {
-		_ = <-status
-	}
-
-	t.Logf("tested %d lmps", tested)
+	group.Wait()
 }
