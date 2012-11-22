@@ -19,6 +19,7 @@ type Plane struct {
 
 type DataSource interface {
 	External() bool
+	GetImage() image.Image
 }
 
 type dataSourceExternal struct {
@@ -28,12 +29,20 @@ func (s dataSourceExternal) External() bool {
 	return true
 }
 
+func (s dataSourceExternal) GetImage() image.Image {
+	return nil
+}
+
 type dataSourceInternal struct {
 	image.Image
 }
 
 func (s dataSourceInternal) External() bool {
 	return false
+}
+
+func (s dataSourceInternal) GetImage() image.Image {
+	return s.Image
 }
 
 type Texture struct {
