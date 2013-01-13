@@ -99,5 +99,5 @@ func DecodeConfig(r io.Reader) (cfg image.Config, err error) {
 }
 
 func init() {
-	image.RegisterFormat("\x0a\x05", "", Decode, DecodeConfig)
+	image.RegisterFormat("pcx", "\x0a\x05", Decode, DecodeConfig)
 }
